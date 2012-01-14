@@ -28,20 +28,16 @@ sub new {
 sub read_file {
 	my ($self, $path) = @_;
 
-	if (ref $path){
-		if (ref $path eq 'ARRAY'){
-			$self->read_file($_) for @$path;
-			return;
-		}
-	} else {
- 		if ($path){
-			local *IN;
- 			open(IN, $path) or die "Couldn't open file: $!";
-			my $source = join '',<IN>;
-			close(IN) or die "Couldn't close file: $!";
-			$self->parse_string($source) if $source;
-			return;
-		}
+	if (ref $path eq 'ARRAY'){
+		$self->read_file($_) for @$path;
+		return;
+	}
+	elsif ( $path && !ref $path ){
+		open(my $IN, $path) or die "Couldn't open file: $!";
+		my $source = join '',<$IN>;
+		close($IN) or die "Couldn't close file: $!";
+		$self->parse_string($source) if $source;
+		return;
 	}
 	die "Only scalars and arrays accepted: $!";
 }
@@ -49,12 +45,14 @@ sub read_file {
 sub read_string {
 	my ($self, $data) = @_;
 
-	if (ref $data){
-		if (ref $data eq 'ARRAY'){
-			$self->read_string($_) for @$data;
-			return;
-		}
-	} else {
+	if (ref $data eq 'ARRAY'){
+		$self->read_string($_) for @$data;
+		return;
+	}
+	elsif (ref $data){
+		return;
+	}
+	else {
 		return $self->parse_string($data) if length $data;
 	}
 }
@@ -62,11 +60,10 @@ sub read_string {
 sub parse_string {
 	my ($self, $string) = @_;
 
-	my $grammar_class = $self->{grammar};
-	return 0 unless $grammar_class;
+	my $grammar_class = $self->{grammar} || return 0;
 
 	$self->load_module($grammar_class);
-        my $grammar = eval "new $grammar_class";
+	my $grammar = eval "new $grammar_class";
 	return 0 unless $grammar;
 
 	#
@@ -118,25 +115,15 @@ sub set_adaptor {
 
 sub output {
 	my $self = shift;
-	my $adaptor_class = shift || $self->{adaptor};
+	my $adaptor_class = shift || $self->{adaptor} || die "no adaptor class";
 
-	unless ($adaptor_class){
-		die "no adaptor class";
-	}
 
-	unless ($self->load_module($adaptor_class)){
-		die "unable to load adaptor module";
-	}
+	die "unable to load adaptor module"	unless ($self->load_module($adaptor_class));
+
 
 	my $adaptor = eval "$adaptor_class->new();";
-
-	unless (defined $adaptor){
-		die "can't create adaptor ($adaptor_class)";
-	}
-
-	unless ($adaptor->can('format_stylesheet')){
-		die "adaptor can't format stylesheets";
-	}
+	die "can't create adaptor ($adaptor_class)"	unless (defined $adaptor);
+	die "adaptor can't format stylesheets"      unless ($adaptor->can('format_stylesheet'));
 
 	return $adaptor->format_stylesheet($self);
 }
