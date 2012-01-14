@@ -38,7 +38,7 @@ sub read_file {
 			local *IN;
  			open(IN, $path) or die "Couldn't open file: $!";
 			my $source = join '',<IN>;
-			close(IN);
+			close(IN) or die "Couldn't close file: $!";
 			$self->parse_string($source) if $source;
 			return;
 		}
